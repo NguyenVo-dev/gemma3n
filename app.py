@@ -59,6 +59,9 @@ if "medical_form" not in st.session_state:
         "notes": "Conversation history:\n"
     }
 
+if "form_submitted" not in st.session_state:
+    st.session_state.form_submitted = False
+
 # Smart response generator
 def generate_response(user_input):
     user_input_lower = user_input.lower()
@@ -137,36 +140,21 @@ with st.sidebar:
             st.write("**Possible Categories:**")
             st.write(", ".join(set(st.session_state.medical_form["categories"])))
     
-    # Form submission
-    with st.form("medical_form"):
-        st.write("**Patient Details**")
-        name = st.text_input("Full Name")
-        age = st.number_input("Age", min_value=1, max_value=120)
-        
-        # Auto-filled from conversation
-        symptoms = st.text_area(
-            "Symptoms Summary",
-            value=", ".join(st.session_state.medical_form["symptoms"]) or "None reported",
-            disabled=True
-        )
-        
-        urgency = st.selectbox(
-            "Urgency Level",
-            ["Non-urgent", "Somewhat urgent", "Very urgent", "Emergency"],
-            index=["Non-urgent", "Somewhat urgent", "Very urgent", "Emergency"].index(
-                st.session_state.medical_form["urgency"]
-            )
-        )
-        
-        if st.form_submit_button("Submit to Doctor"):
-            if name:
-                st.success("Form submitted successfully!")
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": f"📄 **Form Sent to Doctor**\n\nPatient: {name}, {age}\nSymptoms: {symptoms}"
-                })
-            else:
-                st.error("Please enter at least your name")
+    # Form submission - moved outside of form context
+    name = st.text_input("Full Name (required)", key="patient_name")
+    age = st.number_input("Age", min_value=1, max_value=120, key="patient_age")
+    
+    if st.button("Submit to Doctor"):
+        if name:
+            st.session_state.form_submitted = True
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": f"📄 **Form Sent to Doctor**\n\nPatient: {name}, {age}\nSymptoms: {', '.join(st.session_state.medical_form['symptoms']) or 'None'}"
+            })
+            st.success("Form submitted successfully!")
+            st.rerun()
+        else:
+            st.error("Please enter at least your name")
 
 # Main Chat Interface
 st.title("🤖 Symptom Tracker Chatbot")
