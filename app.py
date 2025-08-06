@@ -1,114 +1,189 @@
 import streamlit as st
+from datetime import datetime
 
 # Configure the app
 st.set_page_config(
-    page_title="Medical Chatbot Demo",
+    page_title="Smart Medical Chatbot",
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Critical symptoms (trigger emergency warnings)
-CRITICAL_SYMPTOMS = [
-    "chest pain", "difficulty breathing", "severe bleeding", 
-    "heart attack", "stroke", "unconscious", "choking",
-    "poisoning", "allergic reaction", "suicidal"
-]
+# Enhanced emergency symptoms with specific responses
+EMERGENCY_SYMPTOMS = {
+    "chest pain": {
+        "category": "Cardiac",
+        "response": "🚨 **CARDIAC EMERGENCY**: Chest pain may indicate:\n\n"
+                   "• Heart attack\n• Angina\n• Pulmonary embolism\n\n"
+                   "**Action Required**:\n"
+                   "1. Stop all activity\n2. Call 911/112 immediately\n"
+                   "3. Chew 325mg aspirin if available\n"
+                   "4. Form auto-updated to EMERGENCY status"
+    },
+    "difficulty breathing": {
+        "category": "Respiratory",
+        "response": "🚨 **RESPIRATORY EMERGENCY**: Could indicate:\n\n"
+                   "• Asthma attack\n• Pulmonary edema\n• Pneumothorax\n\n"
+                   "**Action Required**:\n"
+                   "1. Sit upright\n2. Use inhaler if available\n"
+                   "3. Call emergency services\n"
+                   "4. Form marked URGENT"
+    },
+    "severe headache": {
+        "category": "Neurological",
+        "response": "🚨 **NEUROLOGICAL EMERGENCY**: May suggest:\n\n"
+                   "• Stroke\n• Aneurysm\n• Meningitis\n\n"
+                   "**Action Required**:\n"
+                   "1. Check FAST symptoms (Face-Arms-Speech-Time)\n"
+                   "2. Call ambulance immediately\n"
+                   "3. Note time of onset\n"
+                   "4. Form updated with emergency details"
+    }
+}
 
-# Initialize chat history
+# Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = [{
         "role": "assistant",
-        "content": "🏥 **Hello! I'm your Medical Assistant Demo.**\n\n"
-                   "⚠️ *This is a simulation* - real deployment uses Ollama/gemma3n.\n"
-                   "Try mentioning: headache, fever, or emergency symptoms."
+        "content": "🏥 **Smart Medical Assistant**\n\n"
+                   "I'll automatically track symptoms in your form.\n"
+                   "Try: 'I have a headache' or 'My chest hurts badly'"
     }]
-
-# Simulate AI response (no Ollama required)
-def get_response(user_input):
-    user_input = user_input.lower()
     
-    # 1. Emergency check
-    for symptom in CRITICAL_SYMPTOMS:
-        if symptom in user_input:
-            return (
-                f"🚨 **EMERGENCY**: Detected *'{symptom}'*!\n\n"
-                "1. Call emergency services **immediately** (112/115)\n"
-                "2. Do NOT wait for further instructions\n"
-                "3. Follow operator guidance\n\n"
-                "*This is a simulated emergency response.*"
-            )
-    
-    # 2. Common symptoms
-    responses = {
-        "headache": (
-            "**Possible causes**:\n"
-            "- Tension headache\n- Migraine\n- Dehydration\n\n"
-            "**Suggestions**:\n"
-            "- Rest in a dark room\n- Stay hydrated\n"
-            "- Monitor for worsening symptoms\n\n"
-            "*Real AI would provide personalized advice.*"
-        ),
-        "fever": (
-            "**When to seek help**:\n"
-            "- Fever > 39°C (102°F)\n"
-            "- Lasting > 3 days\n- With rash/severe pain\n\n"
-            "**Self-care**:\n"
-            "- Rest\n- Hydrate\n- Use fever reducers if appropriate\n\n"
-            "*Simulated response - consult a doctor.*"
-        ),
-        "form": (
-            "📋 **Medical Form Available in Sidebar**\n\n"
-            "1. Fill out your symptoms\n"
-            "2. Submit to contact a doctor\n"
-            "3. For emergencies, call 112/115"
-        )
+if "medical_form" not in st.session_state:
+    st.session_state.medical_form = {
+        "symptoms": [],
+        "urgency": "Non-urgent",
+        "categories": [],
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "notes": "Conversation history:\n"
     }
+
+# Smart response generator
+def generate_response(user_input):
+    user_input_lower = user_input.lower()
+    response = ""
+    form_updated = False
+    
+    # 1. Check for emergencies first
+    for symptom, details in EMERGENCY_SYMPTOMS.items():
+        if symptom in user_input_lower:
+            # Update form with emergency details
+            st.session_state.medical_form["symptoms"].append(symptom)
+            st.session_state.medical_form["categories"].append(details["category"])
+            st.session_state.medical_form["urgency"] = "Emergency"
+            st.session_state.medical_form["notes"] += f"\n[{datetime.now().strftime('%H:%M')}] EMERGENCY: {symptom}"
+            
+            response = details["response"]
+            form_updated = True
+            break
+    
+    # 2. Handle non-emergency symptoms
+    if not form_updated:
+        symptom_keywords = {
+            "headache": ("Neurological", "Consider pain level and duration"),
+            "fever": ("Infection", "Monitor temperature every 2 hours"),
+            "cough": ("Respiratory", "Note if productive or dry"),
+            "nausea": ("Gastrointestinal", "Track frequency and triggers")
+        }
+        
+        for symptom, (category, note) in symptom_keywords.items():
+            if symptom in user_input_lower:
+                # Add to existing symptoms
+                if symptom not in st.session_state.medical_form["symptoms"]:
+                    st.session_state.medical_form["symptoms"].append(symptom)
+                    st.session_state.medical_form["categories"].append(category)
+                    st.session_state.medical_form["notes"] += f"\n[{datetime.now().strftime('%H:%M')}] Reported {symptom}"
+                
+                response = (
+                    f"✅ Added '{symptom}' to your form\n\n"
+                    f"**Category**: {category}\n"
+                    f"**Advice**: {note}\n\n"
+                    "I'll keep tracking your symptoms. "
+                    "Describe anything else you're feeling."
+                )
+                form_updated = True
+                break
     
     # 3. Default response
-    for keyword, response in responses.items():
-        if keyword in user_input:
-            return response
+    if not form_updated:
+        response = (
+            "Thank you for sharing. I've noted this in your form.\n\n"
+            "Please describe any:\n"
+            "- Specific symptoms\n"
+            "- Pain levels (1-10)\n"
+            "- Duration of symptoms"
+        )
+        st.session_state.medical_form["notes"] += f"\n[{datetime.now().strftime('%H:%M')}] Note: {user_input}"
     
-    return (
-        f"Thanks for your question about *'{user_input}'*.\n\n"
-        "This demo provides:\n"
-        "- Emergency warnings 🚨\n"
-        "- Basic symptom info\n"
-        "- Medical form access\n\n"
-        "**Real AI would give detailed advice here.**"
-    )
+    return response
 
-# Sidebar - Medical Form
+# Sidebar - Auto-updating Medical Form
 with st.sidebar:
-    st.title("Medical Tools")
-    with st.form("health_form"):
-        st.write("**Simulated Patient Form**")
-        name = st.text_input("Name")
-        symptoms = st.text_area("Symptoms")
-        submitted = st.form_submit_button("Submit to Doctor (Demo)")
-        if submitted:
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": f"📄 **Form Submitted (Simulated):**\n\nPatient: {name}\nSymptoms: {symptoms}"
-            })
-            st.toast("Demo form submitted!", icon="📋")
+    st.title("🩺 Auto-Filled Medical Form")
+    
+    # Display real-time form data
+    with st.expander("Current Symptoms", expanded=True):
+        if st.session_state.medical_form["symptoms"]:
+            st.write("**Reported Symptoms:**")
+            for symptom in st.session_state.medical_form["symptoms"]:
+                st.write(f"- {symptom.capitalize()}")
+        else:
+            st.warning("No symptoms reported yet")
+        
+        st.write(f"**Urgency:** {st.session_state.medical_form['urgency']}")
+        
+        if st.session_state.medical_form["categories"]:
+            st.write("**Possible Categories:**")
+            st.write(", ".join(set(st.session_state.medical_form["categories"])))
+    
+    # Form submission
+    with st.form("medical_form"):
+        st.write("**Patient Details**")
+        name = st.text_input("Full Name")
+        age = st.number_input("Age", min_value=1, max_value=120)
+        
+        # Auto-filled from conversation
+        symptoms = st.text_area(
+            "Symptoms Summary",
+            value=", ".join(st.session_state.medical_form["symptoms"]) or "None reported",
+            disabled=True
+        )
+        
+        urgency = st.selectbox(
+            "Urgency Level",
+            ["Non-urgent", "Somewhat urgent", "Very urgent", "Emergency"],
+            index=["Non-urgent", "Somewhat urgent", "Very urgent", "Emergency"].index(
+                st.session_state.medical_form["urgency"]
+            )
+        )
+        
+        if st.form_submit_button("Submit to Doctor"):
+            if name:
+                st.success("Form submitted successfully!")
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": f"📄 **Form Sent to Doctor**\n\nPatient: {name}, {age}\nSymptoms: {symptoms}"
+                })
+            else:
+                st.error("Please enter at least your name")
 
 # Main Chat Interface
-st.title("🤖 Medical Chatbot Demo")
+st.title("🤖 Symptom Tracker Chatbot")
 
-# Display chat messages
+# Display conversation
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
 
 # Chat input
-if prompt := st.chat_input("Describe your symptoms..."):
+if prompt := st.chat_input("Describe how you're feeling..."):
     # Add user message
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
     
-    # Get and display response
-    with st.spinner("Thinking..."):
-        response = get_response(prompt)
+    # Generate and display response
+    with st.spinner("Analyzing..."):
+        response = generate_response(prompt)
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.chat_message("assistant").write(response)
+        st.rerun()  # Refresh to show updated form
